@@ -1,0 +1,121 @@
+operations:
+  - operation_id: send_email
+    display_name: Send Email
+    description: Send one plain-text or template-backed email through the selected SMTP connection.
+    operation_kind: action
+    category: email
+    connection_type_ids: [custom_smtp]
+    workflow_visible: true
+    inputs:
+      - {name: connection_ref, value_type: connection_ref, required: true}
+      - {name: to, value_type: text, required: true}
+      - {name: cc, value_type: text, required: false}
+      - {name: bcc, value_type: text, required: false}
+      - {name: subject, value_type: text, required: false}
+      - {name: body_text, value_type: text, required: false}
+      - {name: template_id, value_type: text, required: false}
+      - {name: variables, value_type: object, required: false}
+      - {name: attachments, value_type: array, required: false}
+    input_mapping_rules:
+      - schema:
+          type: object
+          anyOf:
+            - {required: [body_text]}
+            - {required: [template_id]}
+        error:
+          code: body_required
+          message: Map either Message or Template ID before saving this step.
+          field: body_text
+      - schema:
+          type: object
+          oneOf:
+            - required: [body_text]
+              properties: {template_id: {type: "null"}}
+            - required: [template_id]
+              properties: {body_text: {type: "null"}}
+        error:
+          code: body_source_ambiguous
+          message: Map either Message or Template ID, not both.
+          field: body_text
+      - schema:
+          type: object
+          if: {required: [body_text]}
+          then: {required: [subject]}
+        error:
+          code: subject_required
+          message: Subject is required when Message is provided directly; a saved template may provide its own subject.
+          field: subject
+    outputs:
+      - {name: delivered, value_type: boolean}
+      - {name: provider_message_id, value_type: text}
+      - {name: recipient_count, value_type: integer}
+      - {name: attachment_count, value_type: integer}
+      - {name: estimated_message_bytes, value_type: integer}
+      - {name: external_effect_status, value_type: text}
+      - {name: definitely_no_external_effect, value_type: boolean}
+    result_fields:
+      - result.delivered
+      - result.provider_message_id
+      - result.recipient_count
+      - result.attachment_count
+      - result.estimated_message_bytes
+      - result.external_effect_status
+      - result.definitely_no_external_effect
+    error_codes:
+      - invalid_payload
+      - invalid_connection
+      - unsupported_provider
+      - smtp_host_required
+      - smtp_host_disallowed
+      - smtp_port_not_allowed
+      - smtp_security_invalid
+      - smtp_password_in_config
+      - mailpit_mode_invalid
+      - from_email_required
+      - from_email_invalid
+      - reply_to_invalid
+      - plaintext_smtp_disabled
+      - plaintext_auth_forbidden
+      - smtp_auth_incomplete
+      - recipient_required
+      - recipient_limit_exceeded
+      - recipient_invalid
+      - subject_required
+      - body_required
+      - body_source_ambiguous
+      - template_not_found
+      - template_body_missing
+      - template_variable_missing
+      - template_variable_not_scalar
+      - template_syntax_invalid
+      - smtp_config_in_action_payload
+      - header_injection
+      - attachment_source_invalid
+      - attachment_artifact_required
+      - attachment_artifact_unavailable
+      - attachment_filename_invalid
+      - attachment_type_disallowed
+      - message_size_exceeded
+      - starttls_unavailable
+      - smtp_connect_failed
+      - smtp_auth_failed
+      - smtp_auth_unavailable
+      - smtp_sender_refused
+      - smtp_recipients_refused
+      - smtp_recipients_partially_refused
+      - smtp_helo_failed
+      - smtp_send_failed
+      - timeout_unknown
+      - internal_error
+  - operation_id: deliver_notification
+    display_name: Deliver Notification
+    description: Internal notification-provider delivery contract.
+    operation_kind: action
+    category: notification
+    workflow_visible: false
+    inputs:
+      - {name: event, value_type: object, required: true}
+      - {name: route, value_type: object, required: true}
+    outputs:
+      - {name: delivered, value_type: boolean}
+      - {name: provider_message_id, value_type: text}

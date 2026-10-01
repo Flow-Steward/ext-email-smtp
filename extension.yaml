@@ -1,0 +1,141 @@
+manifest_version: 2
+lifecycle: {data_schema_version: 1, data_migrations: []}
+extension_id: flowsteward.outgoing-email
+kind: notification_provider
+version: 0.1.2
+display_name: Outgoing Email
+description: Send transactional emails from workflows and notifications through your SMTP server.
+vendor:
+  name: Flow Steward
+  support_url: https://github.com/Flow-Steward/ext-email-smtp/issues
+  website_url: https://github.com/Flow-Steward/ext-email-smtp
+listing:
+  category: messaging
+  tags:
+  - email
+  - smtp
+  - notifications
+  summary: Send email from workflow steps and project notifications through a custom SMTP connection.
+features:
+- notify
+- action
+event_subscriptions:
+- {event_type: job.failed, severity: any, conditions: {}}
+- {event_type: job.completed, severity: any, conditions: {}}
+- {event_type: job.awaiting_approval, severity: any, conditions: {}}
+- {event_type: approval.requested, severity: any, conditions: {}}
+- {event_type: approval.resolved, severity: any, conditions: {}}
+- {event_type: notification.delivery.failed, severity: any, conditions: {}}
+required_scopes:
+- notify:dispatch
+- extension:invoke
+- artifact:read
+machine_auth:
+  service_account_key: svc_ext_outgoing_email
+  required_scopes:
+  - notify:dispatch
+  - extension:invoke
+  - artifact:read
+schemas:
+  config: schemas/config.schema.yaml
+  secrets: schemas/secrets.schema.yaml
+  subscriptions: schemas/subscriptions.schema.yaml
+  input:
+    type: object
+    properties:
+      action:
+        type: string
+      event:
+        type: object
+      route:
+        type: object
+      request:
+        type: object
+    required:
+    - action
+  output:
+    type: object
+    properties:
+      ok:
+        type: boolean
+      delivered:
+        type: boolean
+      provider_message_id:
+        type: string
+      external_effect_status:
+        type: string
+    required:
+    - ok
+    - delivered
+account_scope:
+  scope_type: project
+  description: SMTP bindings are per-project and use project connections for non-secret config and password storage.
+external_effects:
+- operation_id: send_email
+  effect_kind: message_delivery
+  channel: email
+  idempotency: required
+  test_mode_behavior: suppress
+  observability:
+    target_fields:
+    - to
+    - cc
+    - bcc
+    target_kind: recipient
+    target_label: recipient
+    artifact_field: attachments
+    payload_size_field: estimated_message_bytes
+  rate_limit:
+    window_seconds: 60
+    account_max: 60
+    project_max: 30
+    connection_max: 15
+- operation_id: deliver_notification
+  effect_kind: message_delivery
+  channel: email
+  idempotency: required
+  test_mode_behavior: suppress
+  observability:
+    target_fields:
+    - to
+    - cc
+    - bcc
+    target_kind: recipient
+    target_label: recipient
+  rate_limit:
+    window_seconds: 60
+    account_max: 60
+    project_max: 30
+    connection_max: 15
+project_state:
+  reads:
+  - namespace: templates
+    state_key_from_input: template_id
+    state_key_prefix: "template:"
+runtime:
+  extension_contract_v2:
+    connection_types: contracts/connection_types.yaml
+    operation_manifest: contracts/operation_manifest.yaml
+    step_ui_manifest: contracts/step_ui_manifest.yaml
+    artifact_policies: contracts/artifact_policies.yaml
+artifact_policies:
+- operation_id: send_email
+  inputs:
+  - kind: artifact
+    value_type: artifact_handle
+    binding_key: attachments
+    from_input: attachments
+    required: false
+entrypoint:
+  mode: subprocess
+  command:
+  - python3
+  - main.py
+health:
+  command:
+  - python3
+  - health.py
+  timeout_seconds: 5
+ui_manifest: ui/ui_manifest.yaml
+action_manifest: ui/actions/actions.yaml
+python_requirements: []

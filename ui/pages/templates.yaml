@@ -1,0 +1,5 @@
+page_id: templates
+title: Templates
+description: Create and edit reusable plain-text email templates.
+components:
+- ref: ../components/templates_form.yaml

@@ -1,0 +1,81 @@
+actions:
+- action_id: send_email
+  title: Send Email
+  description: Send a plain text email through the selected SMTP connection.
+  required_scopes:
+  - extension:invoke
+  - artifact:read
+  handler:
+    mode: extension
+  mutates_platform: false
+  workflow_visible: true
+  parameters:
+  - name: to
+    type: string_or_array
+    required: true
+    description: Recipient email address or list of addresses.
+  - name: cc
+    type: string_or_array
+    required: false
+  - name: bcc
+    type: string_or_array
+    required: false
+  - name: subject
+    type: string
+    required: false
+    description: Required for a direct message; optional when the selected saved template provides its own subject.
+  - name: body_text
+    type: string
+    required: false
+  - name: template_id
+    type: string
+    required: false
+  - name: variables
+    type: object
+    required: false
+  - name: attachments
+    type: artifact_list
+    required: false
+  result_fields:
+  - delivered
+  - provider_message_id
+  - recipient_count
+  - attachment_count
+  - estimated_message_bytes
+  error_codes:
+  - recipient_required
+  - recipient_limit_exceeded
+  - subject_required
+  - body_required
+  - body_source_ambiguous
+  - template_not_found
+  - template_variable_missing
+  - attachment_source_invalid
+  - attachment_type_disallowed
+  - message_size_exceeded
+  - smtp_recipients_partially_refused
+  - smtp_send_failed
+- action_id: deliver_notification
+  title: Deliver Notification
+  description: Send a project notification through SMTP.
+  required_scopes:
+  - notify:dispatch
+  handler:
+    mode: extension
+  mutates_platform: false
+  workflow_visible: false
+  parameters:
+  - name: event
+    type: object
+    required: true
+  - name: route
+    type: object
+    required: true
+  result_fields:
+  - delivered
+  - provider_message_id
+  error_codes:
+  - recipient_required
+  - recipient_limit_exceeded
+  - smtp_recipients_partially_refused
+  - smtp_send_failed

@@ -1,0 +1,3 @@
+component_id: configuration
+type: markdown
+content: Outgoing email uses a project connection for SMTP configuration and secrets.

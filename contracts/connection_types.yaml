@@ -1,0 +1,29 @@
+connection_types:
+  - connection_type_id: custom_smtp
+    display_name: SMTP server
+    description: Project-scoped SMTP server settings with an optional password secret.
+    auth:
+      type: static_secret
+    config_schema:
+      type: object
+      additionalProperties: false
+      required: [provider, host, port, security, from_email]
+      properties:
+        provider: {type: string, const: custom_smtp, default: custom_smtp}
+        host: {type: string, minLength: 1, maxLength: 255}
+        port: {type: integer, enum: [25, 465, 587, 1025, 2525], default: 587}
+        security: {type: string, enum: [ssl, starttls, none], default: starttls}
+        username: {type: string, maxLength: 512}
+        from_email: {type: string, format: email, maxLength: 320}
+        from_name: {type: string, maxLength: 512}
+        reply_to: {type: string, format: email, maxLength: 320}
+        timeout: {type: number, minimum: 1, maximum: 120, default: 15}
+        max_message_bytes: {type: integer, minimum: 1, maximum: 26214400}
+    secret_schema:
+      type: object
+      additionalProperties: false
+      properties:
+        password: {type: string, minLength: 1, maxLength: 4096}
+    capabilities:
+      send_email: true
+      test_connection: true

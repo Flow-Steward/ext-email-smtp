@@ -1,0 +1,4 @@
+version: '1'
+pages:
+- ref: pages/connections.yaml
+- ref: pages/templates.yaml

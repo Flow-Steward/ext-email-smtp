@@ -1,0 +1,29 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Outgoing Email Notification Route Configuration
+type: object
+properties:
+  to:
+    oneOf:
+    - type: string
+    - type: array
+      items:
+        type: string
+  cc:
+    oneOf:
+    - type: string
+    - type: array
+      items:
+        type: string
+  bcc:
+    oneOf:
+    - type: string
+    - type: array
+      items:
+        type: string
+  subject:
+    type: string
+  connection_id:
+    type: string
+required:
+- to
+additionalProperties: true

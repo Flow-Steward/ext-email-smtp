@@ -1,0 +1,12 @@
+forms:
+  - operation_id: send_email
+    title: Send email
+    fields:
+      - {name: to, label: To, widget_type: text, required: true}
+      - {name: cc, label: CC, widget_type: text, required: false}
+      - {name: bcc, label: BCC, widget_type: text, required: false}
+      - {name: subject, label: Subject, widget_type: text, required: false, help_text: Required for a direct message; optional when the selected saved template provides its own subject.}
+      - {name: body_text, label: Message, widget_type: textarea, required: false}
+      - {name: template_id, label: Template ID, widget_type: text, required: false}
+      - {name: variables, label: Template variables, widget_type: json, required: false}
+      - {name: attachments, label: Attachments, widget_type: json, required: false}

@@ -1,0 +1,53 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Outgoing Email SMTP Configuration
+description: Non-secret custom SMTP configuration for project-scoped outbound email.
+type: object
+properties:
+  provider:
+    type: string
+    const: custom_smtp
+    default: custom_smtp
+  host:
+    type: string
+  port:
+    type: integer
+    enum:
+    - 25
+    - 465
+    - 587
+    - 1025
+    - 2525
+    default: 587
+  security:
+    type: string
+    enum:
+    - ssl
+    - starttls
+    - none
+    default: starttls
+  username:
+    type: string
+  from_email:
+    type: string
+    format: email
+  from_name:
+    type: string
+  reply_to:
+    type: string
+    format: email
+  timeout:
+    type: number
+    minimum: 1
+    maximum: 120
+    default: 15
+  max_message_bytes:
+    type: integer
+    minimum: 1
+    maximum: 26214400
+required:
+- provider
+- host
+- port
+- security
+- from_email
+additionalProperties: false

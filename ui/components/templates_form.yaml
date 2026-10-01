@@ -1,0 +1,26 @@
+component_id: templates
+type: state_editor
+title: Plain-text email templates
+description: Templates use strict single-pass {{path}} substitutions.
+data:
+  namespace: templates
+  state_key_prefix: "template:"
+  key_field: template_id
+fields:
+- path: template_id
+  label: Template ID
+  widget: text
+  required: true
+- path: subject
+  label: Subject
+  widget: text
+- path: body_text
+  label: Body text
+  widget: textarea
+  required: true
+  props:
+    rows: 8
+defaults:
+  template_id: ''
+  subject: ''
+  body_text: ''

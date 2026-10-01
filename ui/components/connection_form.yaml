@@ -1,0 +1,73 @@
+component_id: smtp_connection
+type: connection_form
+title: SMTP connection
+description: Store non-secret SMTP settings and password credentials for this project.
+data:
+  connection_kind: extension
+  connection_type: custom_smtp
+  provider: custom_smtp
+  config_fields:
+  - provider
+  - host
+  - port
+  - security
+  - username
+  - from_email
+  - from_name
+  - reply_to
+  - timeout
+  secret_fields:
+  - password
+  required_secret_fields: []
+  tags:
+  - outgoing-email
+defaults:
+  display_name: Outgoing Email
+  port: 587
+  security: starttls
+  timeout: 15
+fields:
+- path: display_name
+  label: Display name
+  widget: text
+- path: environment
+  label: Environment
+  widget: text
+- path: host
+  label: SMTP host
+  widget: text
+  required: true
+- path: port
+  label: Port
+  widget: integer
+  required: true
+- path: security
+  label: Security
+  widget: select
+  required: true
+  options:
+  - value: starttls
+    label: STARTTLS
+  - value: ssl
+    label: SSL
+  - value: none
+    label: None (development only)
+- path: username
+  label: Username
+  widget: text
+- path: password
+  label: Password
+  widget: secret
+- path: from_email
+  label: From email
+  widget: text
+  required: true
+- path: from_name
+  label: From name
+  widget: text
+- path: reply_to
+  label: Reply-to
+  widget: text
+- path: timeout
+  label: Timeout seconds
+  widget: integer

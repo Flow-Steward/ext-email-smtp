@@ -1,0 +1,8 @@
+artifact_policies:
+  - operation_id: send_email
+    inputs:
+      - kind: artifact
+        value_type: artifact_handle
+        binding_key: attachments
+        from_input: attachments
+        required: false
