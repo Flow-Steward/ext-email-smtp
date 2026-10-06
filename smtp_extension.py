@@ -22,6 +22,16 @@ from flowsteward_extension_sdk import (
     stream_artifact_bytes,
 )
 
+try:
+    from flowsteward_extension_sdk import report_progress
+except ImportError:  # a Core with an SDK older than 0.3.0 shows no progress
+
+    def report_progress(
+        message: str = "", *, done: int | None = None, total: int | None = None
+    ) -> None:
+        return None
+
+
 _MESSAGE_ESTIMATED_MIME_MESSAGE_EXCEEDS_SIZE_LIMIT = "Estimated MIME message exceeds size limit"
 _MESSAGE_SMTP_SERVER = "SMTP server"
 
@@ -551,6 +561,12 @@ def _read_attachment_body(
     return b"".join(chunks)
 
 
+def _size_text(size_bytes: int) -> str:
+    if size_bytes >= 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
+    return f"{max(1, round(size_bytes / 1024))} KB"
+
+
 def _load_attachments(
     payload: dict[str, Any],
     input_payload: dict[str, Any],
@@ -560,12 +576,14 @@ def _load_attachments(
 ) -> list[dict[str, Any]]:
     attachments: list[dict[str, Any]] = []
     estimated_message_bytes = _base_message_estimate(body_text)
-    for raw in _as_list(input_payload.get("attachments")):
+    rows = _as_list(input_payload.get("attachments"))
+    for index, raw in enumerate(rows):
         row = _as_dict(raw)
         _validate_attachment_descriptor(row)
         artifact_id = _as_str(row.get("artifact_id") or row.get("artifact_handle"))
         binding_key = _as_str(row.get("binding_key"))
         filename = _attachment_filename(row)
+        report_progress(f"Reading attachment {filename}", done=index, total=len(rows))
         mime_type = _attachment_mime_type(filename, row)
         size_hint = _attachment_size_hint(
             payload,
@@ -923,6 +941,9 @@ def send_email(payload: dict[str, Any]) -> dict[str, Any]:
         body_text=body_text,
         attachments=attachments,
     )
+    if attachments:
+        # A message with attachments can take a while to reach the mail server.
+        report_progress(f"Sending the message ({_size_text(message_size)}) to the mail server")
     try:
         _send_smtp(config, message, flat_recipients)
     except EmailExtensionError:

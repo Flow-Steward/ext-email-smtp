@@ -296,6 +296,67 @@ def test_send_email_sends_valid_pdf_artifact_with_redacted_metadata(monkeypatch)
     send.assert_called_once()
 
 
+def test_send_email_reports_each_attachment_and_the_send(monkeypatch):
+    events: list[tuple[str, int | None, int | None]] = []
+    monkeypatch.setattr(
+        smtp_extension,
+        "stream_artifact_bytes",
+        lambda *args, **kwargs: iter([b"%PDF-1.7"]),
+    )
+    monkeypatch.setattr(
+        smtp_extension,
+        "report_progress",
+        lambda message="", *, done=None, total=None: events.append((message, done, total)),
+    )
+    monkeypatch.setattr(
+        smtp_extension,
+        "_send_smtp",
+        lambda *_args: events.append(("sent", None, None)),
+    )
+
+    response = smtp_extension.handle_payload(
+        _payload(
+            {
+                "to": "alice@example.com",
+                "subject": "Hello",
+                "body_text": "Body",
+                "attachments": [
+                    {
+                        "artifact_id": f"art_{name}",
+                        "filename": f"{name}.pdf",
+                        "content_type": "application/pdf",
+                    }
+                    for name in ("report", "invoice")
+                ],
+            }
+        )
+    )
+
+    assert response["ok"] is True
+    assert [event[:3] for event in events[:2]] == [
+        ("Reading attachment report.pdf", 0, 2),
+        ("Reading attachment invoice.pdf", 1, 2),
+    ]
+    assert events[2][0].startswith("Sending the message (")
+    assert events[2][0].endswith(") to the mail server")
+    assert events[3] == ("sent", None, None)
+
+
+def test_send_email_without_attachments_reports_nothing(monkeypatch):
+    events: list[str] = []
+    monkeypatch.setattr(
+        smtp_extension, "report_progress", lambda message="", **_kwargs: events.append(message)
+    )
+    monkeypatch.setattr(smtp_extension, "_send_smtp", MagicMock())
+
+    response = smtp_extension.handle_payload(
+        _payload({"to": "alice@example.com", "subject": "Hello", "body_text": "Body"})
+    )
+
+    assert response["ok"] is True
+    assert events == []
+
+
 def test_deliver_notification_reads_connection_from_action_payload(monkeypatch):
     send = MagicMock()
     monkeypatch.setattr(smtp_extension, "_send_smtp", send)
