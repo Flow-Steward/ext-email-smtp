@@ -1,7 +1,7 @@
 operations:
   - operation_id: send_email
     display_name: Send Email
-    description: Send one plain-text or template-backed email through the selected SMTP connection.
+    description: Send one plain-text, HTML or template-backed email through the selected SMTP connection.
     operation_kind: action
     category: email
     connection_type_ids: [custom_smtp]
@@ -13,6 +13,7 @@ operations:
       - {name: bcc, value_type: text, required: false}
       - {name: subject, value_type: text, required: false}
       - {name: body_text, value_type: text, required: false}
+      - {name: body_html, value_type: text, required: false}
       - {name: template_id, value_type: text, required: false}
       - {name: variables, value_type: object, required: false}
       - {name: attachments, value_type: array, required: false}
@@ -21,25 +22,26 @@ operations:
           type: object
           anyOf:
             - {required: [body_text]}
+            - {required: [body_html]}
             - {required: [template_id]}
         error:
           code: body_required
-          message: Map either Message or Template ID before saving this step.
+          message: Map a Message, an HTML message or a Template ID before saving this step.
           field: body_text
       - schema:
           type: object
           oneOf:
-            - required: [body_text]
+            - anyOf: [{required: [body_text]}, {required: [body_html]}]
               properties: {template_id: {type: "null"}}
             - required: [template_id]
-              properties: {body_text: {type: "null"}}
+              properties: {body_text: {type: "null"}, body_html: {type: "null"}}
         error:
           code: body_source_ambiguous
-          message: Map either Message or Template ID, not both.
+          message: Map a message (text or HTML) or a Template ID, not both.
           field: body_text
       - schema:
           type: object
-          if: {required: [body_text]}
+          if: {anyOf: [{required: [body_text]}, {required: [body_html]}]}
           then: {required: [subject]}
         error:
           code: subject_required

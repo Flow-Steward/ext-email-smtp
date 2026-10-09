@@ -116,6 +116,7 @@ def test_outgoing_email_publishes_one_workflow_operation_and_hidden_delivery_con
         "bcc",
         "subject",
         "body_text",
+        "body_html",
         "template_id",
         "variables",
         "attachments",

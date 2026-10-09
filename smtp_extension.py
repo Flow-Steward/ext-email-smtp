@@ -10,6 +10,7 @@ import socket
 import ssl
 from dataclasses import dataclass
 from email.message import EmailMessage
+from html.parser import HTMLParser
 from email.policy import SMTP
 from email.utils import formataddr, getaddresses, make_msgid, parseaddr
 from typing import Any
@@ -333,6 +334,61 @@ def _render_template(template: str, variables: dict[str, Any]) -> str:
     return rebuilt
 
 
+_BLOCK_TAGS = frozenset(
+    {"p", "div", "section", "article", "header", "footer", "table", "tr", "ul", "ol",
+     "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "pre", "hr"}
+)
+
+
+class _PlainTextFromHtml(HTMLParser):
+    """The readable text of an HTML body, for clients that show no HTML."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._parts: list[str] = []
+        self._skip = 0
+        self._links: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in {"script", "style", "head", "title"}:
+            self._skip += 1
+        elif tag == "br":
+            self._parts.append("\n")
+        elif tag == "li":
+            self._parts.append("\n- ")
+        elif tag in _BLOCK_TAGS:
+            self._parts.append("\n\n")
+        elif tag in {"td", "th"}:
+            self._parts.append("\t")
+        if tag == "a":
+            self._links.append(next((value or "" for name, value in attrs if name == "href"), ""))
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style", "head", "title"}:
+            self._skip = max(0, self._skip - 1)
+        elif tag in _BLOCK_TAGS:
+            self._parts.append("\n\n")
+        elif tag == "a" and self._links:
+            href = self._links.pop()
+            if href.startswith(("http://", "https://", "mailto:")):
+                self._parts.append(f" ({href})")
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip:
+            self._parts.append(re.sub(r"\s+", " ", data))
+
+    def text(self) -> str:
+        lines = [line.strip() for line in "".join(self._parts).splitlines()]
+        return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip() + "\n"
+
+
+def _plain_text_from_html(body_html: str) -> str:
+    parser = _PlainTextFromHtml()
+    parser.feed(body_html)
+    parser.close()
+    return parser.text()
+
+
 def _project_state_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
     action = _as_dict(payload.get("action"))
     target = _as_dict(action.get("target"))
@@ -350,15 +406,23 @@ def _template_value(payload: dict[str, Any], template_id: str) -> dict[str, Any]
     raise EmailExtensionError("template_not_found", f"Template '{template_id}' was not found")
 
 
-def _message_text(payload: dict[str, Any], input_payload: dict[str, Any]) -> tuple[str, str]:
+def _message_text(
+    payload: dict[str, Any], input_payload: dict[str, Any]
+) -> tuple[str, str, str]:
+    """``(subject, plain text, html)``; html is empty for a plain-text email.
+
+    An HTML body may come alone, and its plain-text alternative is derived from
+    it, or with ``body_text`` as that alternative written by hand.
+    """
     variables = _as_dict(input_payload.get("variables"))
     template_id = _as_str(input_payload.get("template_id"))
     direct_body = input_payload.get("body_text")
+    direct_html = input_payload.get("body_html")
     subject = _as_str(input_payload.get("subject"))
-    if template_id and direct_body not in (None, ""):
+    if template_id and (direct_body not in (None, "") or direct_html not in (None, "")):
         raise EmailExtensionError(
             "body_source_ambiguous",
-            "Use either body_text or template_id, not both",
+            "Use either a message (body_text or body_html) or template_id, not both",
         )
     if template_id:
         template = _template_value(payload, template_id)
@@ -368,9 +432,15 @@ def _message_text(payload: dict[str, Any], input_payload: dict[str, Any]) -> tup
             or template.get("body")
             or template.get("text")
         )
-        if template_body in (None, ""):
+        template_html = template.get("body_html")
+        if template_body in (None, "") and template_html in (None, ""):
             raise EmailExtensionError("template_body_missing", "Template body_text is required")
-        body = _render_template(str(template_body), variables)
+        body_html = _render_template(str(template_html), variables) if template_html else ""
+        body = (
+            _render_template(str(template_body), variables)
+            if template_body not in (None, "")
+            else _plain_text_from_html(body_html)
+        )
         subject_template = template.get("subject")
         if subject:
             rendered_subject = _render_template(subject, variables)
@@ -379,14 +449,17 @@ def _message_text(payload: dict[str, Any], input_payload: dict[str, Any]) -> tup
         else:
             raise EmailExtensionError("subject_required", "subject is required")
     else:
-        if direct_body in (None, ""):
-            raise EmailExtensionError("body_required", "body_text or template_id is required")
-        body = str(direct_body)
+        if direct_body in (None, "") and direct_html in (None, ""):
+            raise EmailExtensionError(
+                "body_required", "body_text, body_html or template_id is required"
+            )
+        body_html = str(direct_html) if direct_html not in (None, "") else ""
+        body = str(direct_body) if direct_body not in (None, "") else _plain_text_from_html(body_html)
         rendered_subject = _render_template(subject, variables)
     rendered_subject = _require_header_safe("subject", rendered_subject)
     if not rendered_subject:
         raise EmailExtensionError("subject_required", "subject is required")
-    return rendered_subject, body
+    return rendered_subject, body, body_html
 
 
 def _reject_config_overrides(input_payload: dict[str, Any]) -> None:
@@ -633,6 +706,7 @@ def _build_email_message(
     subject: str,
     body_text: str,
     attachments: list[dict[str, Any]],
+    body_html: str = "",
 ) -> EmailMessage:
     message = EmailMessage(policy=SMTP)
     message["From"] = (
@@ -646,6 +720,9 @@ def _build_email_message(
     message["Subject"] = subject
     message["Message-ID"] = make_msgid(domain=config.host)
     message.set_content(body_text)
+    if body_html:
+        # multipart/alternative: clients that show HTML pick it, the rest read the text.
+        message.add_alternative(body_html, subtype="html")
     for attachment in attachments:
         message.add_attachment(
             attachment["body"],
@@ -921,12 +998,14 @@ def send_email(payload: dict[str, Any]) -> dict[str, Any]:
         input_payload = _notification_input(payload)
     _reject_config_overrides(input_payload)
     grouped_recipients, flat_recipients = _recipients(input_payload)
-    subject, body_text = _message_text(payload, input_payload)
+    subject, body_text, body_html = _message_text(payload, input_payload)
+    # Size estimates count both bodies; the built message is measured exactly.
+    sized_body = body_text + body_html
     attachments = _load_attachments(
         payload,
         input_payload,
         config=config,
-        body_text=body_text,
+        body_text=sized_body,
     )
     message = _build_email_message(
         config=config,
@@ -934,11 +1013,12 @@ def send_email(payload: dict[str, Any]) -> dict[str, Any]:
         subject=subject,
         body_text=body_text,
         attachments=attachments,
+        body_html=body_html,
     )
     message_size = _check_message_size(
         message,
         config=config,
-        body_text=body_text,
+        body_text=sized_body,
         attachments=attachments,
     )
     if attachments:

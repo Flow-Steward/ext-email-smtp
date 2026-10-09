@@ -1,7 +1,7 @@
 actions:
 - action_id: send_email
   title: Send Email
-  description: Send a plain text email through the selected SMTP connection.
+  description: Send a plain text or HTML email through the selected SMTP connection.
   required_scopes:
   - extension:invoke
   - artifact:read
@@ -27,6 +27,10 @@ actions:
   - name: body_text
     type: string
     required: false
+  - name: body_html
+    type: string
+    required: false
+    description: HTML email body; the plain-text alternative is made from it when body_text is not given.
   - name: template_id
     type: string
     required: false
