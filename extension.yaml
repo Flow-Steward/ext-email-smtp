@@ -70,6 +70,10 @@ schemas:
 account_scope:
   scope_type: project
   description: SMTP bindings are per-project and use project connections for non-secret config and password storage.
+# Where the extension connects: the SMTP host of the connection it sends with.
+egress:
+  connection_fields:
+  - custom_smtp.host
 external_effects:
 - operation_id: send_email
   effect_kind: message_delivery
