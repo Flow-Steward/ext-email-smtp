@@ -4,9 +4,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flowsteward-outgoing-email-extension"
-version = "0.1.0"
+version = "0.3.0"
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+# Tool settings for this repository's checks (the Flow Steward extension gate
+# runs ruff, mypy and bandit from this folder).
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = [".fs-python", "dev-wheels", "wheels"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+explicit_package_bases = true
+exclude = "(^\\.fs-python/|^dev-wheels/|^wheels/)"

@@ -71,6 +71,7 @@ def _literal(name: str):
         if isinstance(node, ast.AnnAssign) and node.value is not None:
             targets = [node.target]
         if any(isinstance(target, ast.Name) and target.id == name for target in targets):
+            assert isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None
             return ast.literal_eval(node.value)
     raise AssertionError(f"{name} is not declared")
 

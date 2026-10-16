@@ -2,7 +2,7 @@ manifest_version: 2
 lifecycle: {data_schema_version: 1, data_migrations: []}
 extension_id: flowsteward.outgoing-email
 kind: notification_provider
-version: 0.2.0
+version: 0.3.0
 display_name: Outgoing Email
 description: Send transactional emails from workflows and notifications through your SMTP server.
 vendor:
@@ -117,6 +117,7 @@ project_state:
     state_key_from_input: template_id
     state_key_prefix: "template:"
 runtime:
+  contract_version: extension_host_v2
   extension_contract_v2:
     connection_types: contracts/connection_types.yaml
     operation_manifest: contracts/operation_manifest.yaml

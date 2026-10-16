@@ -192,7 +192,7 @@ def _mailpit(path: str) -> dict[str, Any]:
     base = str(os.environ.get("FS_SMOKE_MAILPIT_BASE") or "").rstrip("/")
     if not base:
         raise RuntimeError("FS_SMOKE_MAILPIT_BASE is not set")
-    with urllib.request.urlopen(base + path, timeout=15) as response:
+    with urllib.request.urlopen(base + path, timeout=15) as response:  # nosec B310 - the operator's own mail sink URL
         payload = json.loads(response.read().decode() or "{}")
     return dict(payload) if isinstance(payload, dict) else {}
 

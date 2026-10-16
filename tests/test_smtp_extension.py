@@ -5,9 +5,29 @@ from unittest.mock import MagicMock
 
 import smtp_extension
 
+# The final extension_host_v2 execution scope: all four keys, at most one owner.
+ROOT_STEP_SCOPE = {
+    "group_id": None,
+    "for_each_id": None,
+    "step_id": "send_email",
+    "step_execution_id": "8c4f2a10-3b6d-4e7f-9a21-5d0e6c1b0001",
+}
+GROUP_STEP_SCOPE = {**ROOT_STEP_SCOPE, "group_id": "notify_customers"}
+FOR_EACH_STEP_SCOPE = {
+    **ROOT_STEP_SCOPE,
+    "for_each_id": "each_customer",
+    "step_execution_id": "8c4f2a10-3b6d-4e7f-9a21-5d0e6c1b0002",
+}
+#: A notification delivery names the scope of its event; a workflow-level one none.
+NO_STEP_SCOPE = dict.fromkeys(ROOT_STEP_SCOPE)
+
 
 def _payload(
-    input_payload: dict, *, config: dict | None = None, runtime_context: dict | None = None
+    input_payload: dict,
+    *,
+    config: dict | None = None,
+    runtime_context: dict | None = None,
+    scope: dict | None = None,
 ) -> dict:
     smtp_config = {
         "provider": "custom_smtp",
@@ -20,9 +40,12 @@ def _payload(
     }
     smtp_config.update(config or {})
     return {
-        "contract_version": "extension_host_v1",
+        "contract_version": "extension_host_v2",
         "mode": "action",
-        "runtime_context": runtime_context or {},
+        "runtime_context": {
+            **(FOR_EACH_STEP_SCOPE if scope is None else scope),
+            **(runtime_context or {}),
+        },
         "action": {
             "action_id": "send_email",
             "target": {
@@ -361,6 +384,8 @@ def test_deliver_notification_reads_connection_from_action_payload(monkeypatch):
     send = MagicMock()
     monkeypatch.setattr(smtp_extension, "_send_smtp", send)
     payload = {
+        "contract_version": "extension_host_v2",
+        "runtime_context": dict(NO_STEP_SCOPE),
         "action": "deliver_notification",
         "action_payload": {
             "action_id": "deliver_notification",

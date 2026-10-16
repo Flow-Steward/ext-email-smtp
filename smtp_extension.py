@@ -19,19 +19,11 @@ from flowsteward_extension_sdk import (
     ArtifactAccessError,
     PinnedPeerError,
     find_artifact_descriptor,
+    report_progress,
     resolve_pinned_ips,
+    runtime_context_from_payload,
     stream_artifact_bytes,
 )
-
-try:
-    from flowsteward_extension_sdk import report_progress
-except ImportError:  # a Core with an SDK older than 0.3.0 shows no progress
-
-    def report_progress(
-        message: str = "", *, done: int | None = None, total: int | None = None
-    ) -> None:
-        return None
-
 
 _MESSAGE_ESTIMATED_MIME_MESSAGE_EXCEEDS_SIZE_LIMIT = "Estimated MIME message exceeds size limit"
 _MESSAGE_SMTP_SERVER = "SMTP server"
@@ -335,8 +327,27 @@ def _render_template(template: str, variables: dict[str, Any]) -> str:
 
 
 _BLOCK_TAGS = frozenset(
-    {"p", "div", "section", "article", "header", "footer", "table", "tr", "ul", "ol",
-     "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "pre", "hr"}
+    {
+        "p",
+        "div",
+        "section",
+        "article",
+        "header",
+        "footer",
+        "table",
+        "tr",
+        "ul",
+        "ol",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "blockquote",
+        "pre",
+        "hr",
+    }
 )
 
 
@@ -406,9 +417,7 @@ def _template_value(payload: dict[str, Any], template_id: str) -> dict[str, Any]
     raise EmailExtensionError("template_not_found", f"Template '{template_id}' was not found")
 
 
-def _message_text(
-    payload: dict[str, Any], input_payload: dict[str, Any]
-) -> tuple[str, str, str]:
+def _message_text(payload: dict[str, Any], input_payload: dict[str, Any]) -> tuple[str, str, str]:
     """``(subject, plain text, html)``; html is empty for a plain-text email.
 
     An HTML body may come alone, and its plain-text alternative is derived from
@@ -454,7 +463,9 @@ def _message_text(
                 "body_required", "body_text, body_html or template_id is required"
             )
         body_html = str(direct_html) if direct_html not in (None, "") else ""
-        body = str(direct_body) if direct_body not in (None, "") else _plain_text_from_html(body_html)
+        body = (
+            str(direct_body) if direct_body not in (None, "") else _plain_text_from_html(body_html)
+        )
         rendered_subject = _render_template(subject, variables)
     rendered_subject = _require_header_safe("subject", rendered_subject)
     if not rendered_subject:
@@ -806,6 +817,7 @@ def _smtp_client(config: SmtpConfig):
     last_error: Exception | None = None
     for ip in ips:
         try:
+            client: smtplib.SMTP
             if config.security == "ssl":
                 client = _PinnedSmtpSsl(config.host, config.port, config.timeout, ip, context)
             else:
@@ -927,6 +939,51 @@ def _is_test_mode(payload: dict[str, Any]) -> bool:
     return _as_bool(runtime.get("test_mode")) or _as_bool(context.get("test_mode"))
 
 
+def _notification_scope_lines(event: dict[str, Any], event_payload: dict[str, Any]) -> list[str]:
+    """The workflow and execution scope of one event, as Core's standard email names them.
+
+    A Group line only for a real group, a For each line only for a For each,
+    a Step line only for a step; the root of a workflow has no label of its own.
+    """
+
+    def scope_id(key: str) -> str:
+        return _as_str(event.get(key)) or _as_str(event_payload.get(key))
+
+    group_id = scope_id("group_id")
+    for_each_id = scope_id("for_each_id")
+    step_id = scope_id("step_id")
+    details = [
+        (
+            "Workflow",
+            _as_str(event_payload.get("workflow_display_name"))
+            or _as_str(event_payload.get("workflow_name"))
+            or _as_str(event.get("workflow_id")),
+        ),
+        ("Group", (_as_str(event_payload.get("group_label")) or group_id) if group_id else ""),
+        (
+            "For each",
+            (_as_str(event_payload.get("for_each_label")) or for_each_id) if for_each_id else "",
+        ),
+        ("Step", (_as_str(event_payload.get("step_label")) or step_id) if step_id else ""),
+    ]
+    return [f"{label}: {value}" for label, value in details if value]
+
+
+def _notification_body(event: dict[str, Any], event_payload: dict[str, Any]) -> str:
+    message = (
+        _as_str(event_payload.get("message"))
+        or _as_str(event_payload.get("summary"))
+        or _as_str(event.get("summary"))
+        or _as_str(event.get("event_type"))
+        or "notification"
+    )
+    # Core's standard email already carries these lines; never repeat one.
+    scope_lines = [
+        line for line in _notification_scope_lines(event, event_payload) if line not in message
+    ]
+    return "\n".join([message, "", *scope_lines]) if scope_lines else message
+
+
 def _notification_input(payload: dict[str, Any]) -> dict[str, Any]:
     event = _as_dict(payload.get("event"))
     route = _as_dict(payload.get("route"))
@@ -935,12 +992,7 @@ def _notification_input(payload: dict[str, Any]) -> dict[str, Any]:
     event_type = _as_str(event.get("event_type")) or "notification"
     severity = _as_str(event.get("severity") or "info").upper()
     subject = _as_str(route_config.get("subject")) or f"[{severity}] {event_type}"
-    body = (
-        _as_str(event_payload.get("message"))
-        or _as_str(event_payload.get("summary"))
-        or _as_str(event.get("summary"))
-        or event_type
-    )
+    body = _notification_body(event, event_payload)
     return {
         "to": route_config.get("to") or route_config.get("recipients"),
         "cc": route_config.get("cc"),
@@ -1051,8 +1103,23 @@ def send_email(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def handle_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    root = _as_dict(payload)
+    # The host envelope is checked before anything is read or sent: another
+    # contract, a missing execution-scope key or two owners is refused here.
     try:
-        return send_email(_as_dict(payload))
+        runtime_context_from_payload(root)
+    except ValueError as exc:
+        return _result(
+            ok=False,
+            delivered=False,
+            error_code="invalid_host_envelope",
+            error=str(exc),
+            external_effect_status="failed",
+            definitely_no_external_effect=True,
+            metadata={},
+        )
+    try:
+        return send_email(root)
     except EmailExtensionError as exc:
         return _result(
             ok=False,

@@ -84,7 +84,11 @@ def test_an_html_email_keeps_its_attachments(monkeypatch) -> None:
             "subject": "Report",
             "body_html": "<p>See the <b>report</b>.</p>",
             "attachments": [
-                {"artifact_id": "art_pdf", "filename": "report.pdf", "content_type": "application/pdf"}
+                {
+                    "artifact_id": "art_pdf",
+                    "filename": "report.pdf",
+                    "content_type": "application/pdf",
+                }
             ],
         },
     )
@@ -125,7 +129,10 @@ def test_a_saved_template_may_carry_an_html_body(monkeypatch) -> None:
             {
                 "namespace": "templates",
                 "state_key": "template:welcome",
-                "value": {"subject": "Welcome {{name}}", "body_html": "<p>Hello <b>{{name}}</b></p>"},
+                "value": {
+                    "subject": "Welcome {{name}}",
+                    "body_html": "<p>Hello <b>{{name}}</b></p>",
+                },
             }
         ]
     }
@@ -157,7 +164,10 @@ def test_the_size_limit_counts_the_html_body(monkeypatch) -> None:
         ({"body_text": "x", "body_html": "<p>x</p>", "subject": "S"}, []),
         ({"template_id": "welcome"}, []),
         ({"body_html": "<p>x</p>"}, ["subject_required"]),
-        ({"body_html": "<p>x</p>", "template_id": "welcome", "subject": "S"}, ["body_source_ambiguous"]),
+        (
+            {"body_html": "<p>x</p>", "template_id": "welcome", "subject": "S"},
+            ["body_source_ambiguous"],
+        ),
         ({"subject": "S"}, ["body_required", "body_source_ambiguous"]),
     ],
 )
@@ -172,9 +182,11 @@ def test_the_step_mapping_rules_accept_an_html_message(mapped: dict, failing: li
         (Path(__file__).resolve().parents[1] / "contracts/operation_manifest.yaml").read_text()
     )
     operation = next(op for op in manifest["operations"] if op["operation_id"] == "send_email")
-    instance = {
-        name: None for name in ("body_text", "body_html", "template_id")
-    } | {"to": "a@example.com"} | mapped
+    instance = (
+        {name: None for name in ("body_text", "body_html", "template_id")}
+        | {"to": "a@example.com"}
+        | mapped
+    )
     instance = {key: value for key, value in instance.items() if value is not None or key in mapped}
     failed = [
         rule["error"]["code"]
