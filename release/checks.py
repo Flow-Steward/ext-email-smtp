@@ -95,8 +95,12 @@ RELEASE_CONNECTIONS = [
 
 #: The workflow a user would author to send mail: one connector step bound to
 #: this extension's `send_email`, reading its recipient and body from the task's
-#: declared inputs. Authoring it is a registry write and therefore admin-only, so
-#: the definition is declared here and the harness performs the write.
+#: declared inputs, then a success stop. Authoring it is a registry write and
+#: therefore admin-only, so the definition is declared here and the harness
+#: performs the write: it creates the metadata (disabled), applies `changes` to
+#: that revision through `/api/workflows/<id>/changes`, enables it when
+#: `enabled` is true and binds it to the project. The definition is never part
+#: of the metadata; there are no phases.
 RELEASE_WORKFLOWS = [
     {
         "key": "send",
@@ -117,61 +121,60 @@ RELEASE_WORKFLOWS = [
                 ],
             }
         },
-        "phases": [
+        "changes": [
             {
-                "phase_id": "deliver",
-                "phase_kind": "start",
-                "display_name": "Deliver",
-                "gate": {"type": "none"},
-                "steps": [
-                    {
-                        "step_id": "send_release_email",
-                        "display_name": "Send Release Email",
-                        "step_kind": "connector",
-                        "connector_id": "extension.flowsteward.outgoing-email",
-                        "connector_install_id": "${install:flowsteward.outgoing-email}",
-                        "connection_binding_jsonb": {"connection_id": "${connection:smtp}"},
-                        "override": {
-                            "connector": {
-                                "extension_id": "flowsteward.outgoing-email",
-                                "operation_id": "send_email",
-                                "input_mapping": {
-                                    "to": "state.inputs.recipient",
-                                    "subject": "state.inputs.subject",
-                                    "body_text": "state.inputs.body_text",
-                                },
-                                "output_mapping": {
-                                    "provider_message_id": "state.provider_message_id",
-                                    "delivered": "state.delivered",
-                                },
-                            }
-                        },
-                        "input_mapping_jsonb": {
-                            "to": "state.inputs.recipient",
-                            "subject": "state.inputs.subject",
-                            "body_text": "state.inputs.body_text",
-                        },
-                        "output_mapping_jsonb": {
-                            "provider_message_id": "state.provider_message_id",
-                            "delivered": "state.delivered",
-                        },
-                    }
-                ],
+                "op": "create_step",
+                "step": {
+                    "step_id": "send_release_email",
+                    "display_name": "Send Release Email",
+                    "step_kind": "connector",
+                    "connector_id": "extension.flowsteward.outgoing-email",
+                    "connector_install_id": "${install:flowsteward.outgoing-email}",
+                    "connection_binding_jsonb": {"connection_id": "${connection:smtp}"},
+                    "override": {
+                        "connector": {
+                            "extension_id": "flowsteward.outgoing-email",
+                            "operation_id": "send_email",
+                            "input_mapping": {
+                                "to": "state.inputs.recipient",
+                                "subject": "state.inputs.subject",
+                                "body_text": "state.inputs.body_text",
+                            },
+                            "output_mapping": {
+                                "provider_message_id": "state.provider_message_id",
+                                "delivered": "state.delivered",
+                            },
+                        }
+                    },
+                    "input_mapping_jsonb": {
+                        "to": "state.inputs.recipient",
+                        "subject": "state.inputs.subject",
+                        "body_text": "state.inputs.body_text",
+                    },
+                    "output_mapping_jsonb": {
+                        "provider_message_id": "state.provider_message_id",
+                        "delivered": "state.delivered",
+                    },
+                },
             },
             {
-                "phase_id": "done",
-                "phase_kind": "end",
-                "display_name": "Done",
-                "gate": {"type": "none"},
-                "steps": [
-                    {
-                        "step_id": "sent",
-                        "display_name": "Sent",
-                        "step_kind": "stop_success",
-                        "override": {"stop_success": {"reason": "message delivered"}},
-                    }
-                ],
+                "op": "create_step",
+                "step": {
+                    "step_id": "sent",
+                    "display_name": "Sent",
+                    "step_kind": "stop_success",
+                    "override": {"stop_success": {"reason": "message delivered"}},
+                },
             },
+            {
+                "op": "connect",
+                "edge": {
+                    "source": {"kind": "step", "id": "send_release_email"},
+                    "outcome": {"name": "success"},
+                    "target": {"kind": "step", "id": "sent"},
+                },
+            },
+            {"op": "set_entry", "target": {"kind": "step", "id": "send_release_email"}},
         ],
     }
 ]

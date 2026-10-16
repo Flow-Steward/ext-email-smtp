@@ -94,19 +94,56 @@ def test_the_declared_fixtures_are_pure_literals() -> None:
 
 def test_the_workflow_sends_through_a_connector_step() -> None:
     """The step is what a user would author, bound to this extension's action."""
-    module = _checks_module()
-
-    workflow = next(spec for spec in module.RELEASE_WORKFLOWS if spec["key"] == "send")
-    step = workflow["phases"][0]["steps"][0]
+    workflow = next(spec for spec in _literal("RELEASE_WORKFLOWS") if spec["key"] == "send")
+    steps = {
+        operation["step"]["step_id"]: operation["step"]
+        for operation in workflow["changes"]
+        if operation["op"] == "create_step"
+    }
+    step = steps["send_release_email"]
     assert step["step_kind"] == "connector"
     assert step["connector_id"] == "extension.flowsteward.outgoing-email"
     assert step["override"]["connector"]["operation_id"] == "send_email"
+    assert step["override"]["connector"]["input_mapping"] == {
+        "to": "state.inputs.recipient",
+        "subject": "state.inputs.subject",
+        "body_text": "state.inputs.body_text",
+    }
     # Filled by the harness, because only the trusted side knows them.
     assert step["connector_install_id"].startswith("${install:")
     assert step["connection_binding_jsonb"]["connection_id"].startswith("${connection:")
+    assert steps["sent"]["step_kind"] == "stop_success"
     expected_inputs = workflow["settings"]["callable"]["expected_inputs"]
     subject = next(item for item in expected_inputs if item["name"] == "subject")
     assert subject["required"] is True
+
+
+def test_the_workflow_is_declared_as_metadata_and_one_change_set() -> None:
+    """The harness posts the metadata, then applies `changes` to its revision.
+
+    A declaration that carries its definition (steps, groups or the removed
+    phases) or no change set is refused by the harness, so neither is here.
+    The operations use the change service's own format: `op` names each one.
+    """
+    for workflow in _literal("RELEASE_WORKFLOWS"):
+        assert not {"steps", "groups", "phases", "_phases"} & set(workflow)
+        assert workflow["enabled"] is True
+        operations = workflow["changes"]
+        assert {operation["op"] for operation in operations} <= {
+            "create_step",
+            "connect",
+            "set_entry",
+        }
+        created = [op["step"]["step_id"] for op in operations if op["op"] == "create_step"]
+        assert created == ["send_release_email", "sent"]
+        [edge] = [op["edge"] for op in operations if op["op"] == "connect"]
+        assert edge == {
+            "source": {"kind": "step", "id": "send_release_email"},
+            "outcome": {"name": "success"},
+            "target": {"kind": "step", "id": "sent"},
+        }
+        [entry] = [op for op in operations if op["op"] == "set_entry"]
+        assert entry == {"op": "set_entry", "target": {"kind": "step", "id": "send_release_email"}}
 
 
 def test_a_blocked_precondition_stops_before_provoking_a_second_failure() -> None:
