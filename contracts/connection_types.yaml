@@ -12,7 +12,11 @@ connection_types:
         provider: {type: string, const: custom_smtp, default: custom_smtp}
         host: {type: string, minLength: 1, maxLength: 255}
         port: {type: integer, enum: [25, 465, 587, 1025, 2525], default: 587}
-        security: {type: string, enum: [ssl, starttls, none], default: starttls}
+        security:
+          type: string
+          enum: [ssl, starttls, none]
+          default: starttls
+          description: Use TLS for ordinary connections. None is reserved for an operator-provisioned trusted development/test fixture without authentication; schema validity and connection Environment do not grant deployment policy permission.
         username: {type: string, maxLength: 512}
         from_email: {type: string, format: email, maxLength: 320}
         from_name: {type: string, maxLength: 512}

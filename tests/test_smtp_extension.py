@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import smtplib
+import ssl
 from unittest.mock import MagicMock
+
+import pytest
 
 import smtp_extension
 
@@ -482,21 +485,27 @@ def test_send_email_rejects_oversized_attachment_descriptor_before_download(monk
     send.assert_not_called()
 
 
-def test_send_email_rejects_plaintext_auth_even_with_dev_override(monkeypatch):
+@pytest.mark.parametrize(
+    ("username", "password"),
+    [("mailer", ""), ("", "fixture-password"), ("mailer", "fixture-password")],
+)
+def test_send_email_rejects_plaintext_auth_even_with_dev_override(monkeypatch, username, password):
     monkeypatch.setenv("FS_ALLOW_PRIVATE_REMOTE_URLS", "1")
 
-    response = smtp_extension.handle_payload(
-        _payload(
-            {"to": "alice@example.com", "subject": "Hello", "body_text": "Body"},
-            config={"security": "none"},
-        )
+    payload = _payload(
+        {"to": "alice@example.com", "subject": "Hello", "body_text": "Body"},
+        config={"security": "none", "username": username},
     )
+    payload["action"]["target"]["connection"]["secrets"] = {"password": password}
+    response = smtp_extension.handle_payload(payload)
 
     assert response["ok"] is False
     assert response["error_code"] == "plaintext_auth_forbidden"
+    assert response["definitely_no_external_effect"] is True
 
 
 def test_mailpit_connection_is_representable_only_with_the_dev_private_override(monkeypatch):
+    monkeypatch.delenv("FS_ALLOW_PRIVATE_REMOTE_URLS", raising=False)
     payload = _payload(
         {"to": "alice@example.com", "subject": "Hello", "body_text": "Body"},
         config={
@@ -507,10 +516,22 @@ def test_mailpit_connection_is_representable_only_with_the_dev_private_override(
         },
     )
     payload["action"]["target"]["connection"]["secrets"] = {}
+    payload["action"]["target"]["connection"]["environment"] = "development"
+    dns = MagicMock(side_effect=AssertionError("Policy must refuse before DNS"))
+    send = MagicMock(side_effect=AssertionError("Policy must refuse before dispatch"))
+    monkeypatch.setattr(smtp_extension, "resolve_pinned_ips", dns)
+    monkeypatch.setattr(smtp_extension, "_send_smtp", send)
 
     denied = smtp_extension.handle_payload(payload)
     assert denied["ok"] is False
     assert denied["error_code"] == "plaintext_smtp_disabled"
+    assert denied["definitely_no_external_effect"] is True
+    assert "deployment policy" in denied["error"]
+    assert "STARTTLS or SSL/TLS" in denied["error"]
+    assert "operator" in denied["error"]
+    assert "Environment does not enable plaintext" in denied["error"]
+    dns.assert_not_called()
+    send.assert_not_called()
 
     monkeypatch.setenv("FS_ALLOW_PRIVATE_REMOTE_URLS", "1")
     monkeypatch.setattr(smtp_extension, "_send_smtp", lambda *_args, **_kwargs: None)
@@ -521,6 +542,8 @@ def test_mailpit_connection_is_representable_only_with_the_dev_private_override(
 
 
 def test_send_email_rejects_unsafe_smtp_dns(monkeypatch):
+    monkeypatch.delenv("FS_ALLOW_PRIVATE_REMOTE_URLS", raising=False)
+
     def _blocked(*args, **kwargs):
         raise smtp_extension.PinnedPeerError("SMTP server resolves to disallowed address")
 
@@ -705,3 +728,54 @@ def test_smtp_partial_recipient_refusal_fails_partial(monkeypatch):
     assert response["error_code"] == "smtp_recipients_partially_refused"
     assert response["external_effect_status"] == "timeout_unknown"
     assert "bad@example.com" not in str(response)
+
+
+@pytest.mark.parametrize("peer", ["127.0.0.1", "10.1.2.3", "::1"])
+def test_connected_private_smtp_peer_is_refused_under_default_policy(monkeypatch, peer):
+    monkeypatch.delenv("FS_ALLOW_PRIVATE_REMOTE_URLS", raising=False)
+    sock = MagicMock()
+    sock.getpeername.return_value = (peer, 587)
+    with pytest.raises(smtp_extension.PinnedPeerError, match="disallowed address"):
+        smtp_extension._assert_connected_peer(sock, "SMTP server")
+
+
+def test_starttls_authenticated_send_upgrades_before_auth_without_weakening_tls(monkeypatch):
+    monkeypatch.delenv("FS_ALLOW_PRIVATE_REMOTE_URLS", raising=False)
+    events = []
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout, pinned_ip):
+            assert (host, port, pinned_ip) == ("smtp.example.com", 587, "8.8.8.8")
+
+        def ehlo(self):
+            events.append("ehlo")
+
+        def has_extn(self, name):
+            assert name == "starttls"
+            return True
+
+        def starttls(self, *, context):
+            assert context.check_hostname is True
+            assert context.verify_mode == ssl.CERT_REQUIRED
+            events.append("starttls")
+
+        def login(self, username, password):
+            assert (username, password) == ("mailer", "secret-password")
+            events.append("auth")
+
+        def send_message(self, message, *, from_addr, to_addrs):
+            assert from_addr == "robot@example.com"
+            assert to_addrs == ["alice@example.com"]
+            events.append("send")
+            return {}
+
+        def quit(self):
+            events.append("quit")
+
+    monkeypatch.setattr(smtp_extension, "resolve_pinned_ips", lambda *args, **kwargs: ["8.8.8.8"])
+    monkeypatch.setattr(smtp_extension, "_PinnedSMTP", FakeSMTP)
+    result = smtp_extension.handle_payload(
+        _payload({"to": "alice@example.com", "subject": "Hello", "body_text": "Body"})
+    )
+    assert result["ok"] is True
+    assert events == ["ehlo", "starttls", "ehlo", "auth", "send", "quit"]

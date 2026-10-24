@@ -69,6 +69,59 @@ def test_outgoing_email_required_fields_are_declared_by_the_extension() -> None:
     )
 
 
+def test_plaintext_is_unavailable_in_the_form_without_removing_backend_fixture_support() -> None:
+    form = _load_yaml("ui/components/connection_form.yaml")
+    fields = {field["path"]: field for field in form["fields"]}
+    options = {option["value"]: option for option in fields["security"]["options"]}
+
+    assert options["none"].get("disabled") is True
+    assert "unavailable" in options["none"]["label"].lower()
+    assert not options["starttls"].get("disabled", False)
+    assert not options["ssl"].get("disabled", False)
+    assert form["defaults"]["security"] == "starttls"
+    security_help = fields["security"].get("description") or fields["security"].get("help", "")
+    assert "operator" in security_help.lower()
+    assert "Environment does not enable plaintext" in security_help
+    assert "no username or password" in security_help
+    assert "metadata" in fields["environment"]["description"]
+    assert "1025" in fields["port"]["description"]
+    assert "TLS port" in fields["port"]["description"]
+    assert form["data"]["secret_fields"] == ["password"]
+    assert form["data"]["required_secret_fields"] == []
+    assert set(fields) == {
+        "display_name",
+        "environment",
+        "host",
+        "port",
+        "security",
+        "username",
+        "password",
+        "from_email",
+        "from_name",
+        "reply_to",
+        "timeout",
+    }
+    schema = _load_yaml("schemas/config.schema.yaml")
+    connection_schema = _load_yaml("contracts/connection_types.yaml")["connection_types"][0][
+        "config_schema"
+    ]
+    for backend_schema in (schema, connection_schema):
+        assert backend_schema["properties"]["security"]["enum"] == ["ssl", "starttls", "none"]
+        assert backend_schema["additionalProperties"] is False
+        assert set(backend_schema["properties"]) == {
+            "provider",
+            "host",
+            "port",
+            "security",
+            "username",
+            "from_email",
+            "from_name",
+            "reply_to",
+            "timeout",
+            "max_message_bytes",
+        }
+
+
 def test_outgoing_email_publishes_one_workflow_operation_and_hidden_delivery_contract() -> None:
     operation_manifest = _load_yaml("contracts/operation_manifest.yaml")["operations"]
     connection_types = _load_yaml("contracts/connection_types.yaml")["connection_types"]

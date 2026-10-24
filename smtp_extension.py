@@ -239,7 +239,11 @@ def _connection_config(payload: dict[str, Any]) -> SmtpConfig:
     if security == "none":
         if not _private_override_enabled():
             raise EmailExtensionError(
-                "plaintext_smtp_disabled", "security none requires dev/test override"
+                "plaintext_smtp_disabled",
+                "Plaintext SMTP is disabled by deployment policy. Use STARTTLS or SSL/TLS. "
+                "For a trusted development/test fixture, ask the operator to provision the "
+                "documented SMTP policy with no username or password. Changing connection "
+                "Environment does not enable plaintext SMTP. Authentication always requires TLS.",
             )
         if username or password:
             raise EmailExtensionError(

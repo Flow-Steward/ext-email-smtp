@@ -32,6 +32,7 @@ fields:
   widget: text
 - path: environment
   label: Environment
+  description: Connection metadata only; this does not change the deployment's SMTP or network policy.
   widget: text
 - path: host
   label: SMTP host
@@ -39,19 +40,22 @@ fields:
   required: true
 - path: port
   label: Port
+  description: Port 1025 is reserved for an operator-provisioned development/test Mailpit fixture using no TLS and no authentication. Use your server's TLS port for connections configured here.
   widget: integer
   required: true
 - path: security
   label: Security
+  description: Use STARTTLS or SSL/TLS. None / no TLS is unavailable in this form. A trusted development/test Mailpit fixture requires operator-approved deployment policy and no username or password. Changing Environment does not enable plaintext SMTP. Authentication always requires TLS.
   widget: select
   required: true
   options:
   - value: starttls
     label: STARTTLS
   - value: ssl
-    label: SSL
+    label: SSL/TLS
   - value: none
-    label: None (development only)
+    label: None / no TLS (unavailable in this form)
+    disabled: true
 - path: username
   label: Username
   widget: text

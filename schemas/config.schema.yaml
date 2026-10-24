@@ -19,6 +19,7 @@ properties:
     - 2525
     default: 587
   security:
+    description: Use TLS for ordinary connections. None is reserved for an operator-provisioned trusted development/test fixture without authentication; schema validity and connection Environment do not grant deployment policy permission.
     type: string
     enum:
     - ssl
