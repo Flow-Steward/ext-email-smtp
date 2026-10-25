@@ -8,18 +8,21 @@ properties:
     - type: array
       items:
         type: string
+        format: email
   cc:
     oneOf:
     - type: string
     - type: array
       items:
         type: string
+        format: email
   bcc:
     oneOf:
     - type: string
     - type: array
       items:
         type: string
+        format: email
   subject:
     type: string
   connection_id:

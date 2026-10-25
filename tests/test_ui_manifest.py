@@ -223,3 +223,11 @@ def test_outgoing_email_declares_catalog_metadata_without_bundle_trust() -> None
     assert manifest["machine_auth"]["service_account_key"] == "svc_ext_outgoing_email"
 
     assert not (EXTENSION_ROOT / ".fs-extension-install.yaml").exists()
+
+
+def test_notification_recipient_items_declare_email_without_narrowing_csv() -> None:
+    schema = _load_yaml("schemas/subscriptions.schema.yaml")
+    for field in ("to", "cc", "bcc"):
+        scalar, array = schema["properties"][field]["oneOf"]
+        assert scalar == {"type": "string"}
+        assert array == {"type": "array", "items": {"type": "string", "format": "email"}}
