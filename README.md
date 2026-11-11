@@ -1,14 +1,17 @@
 # Outgoing Email
 
-Sends email from workflow steps (`send_email`) and project notifications
-(`deliver_notification`) through a project's custom SMTP connection.
+Outgoing Email sends workflow messages and project notifications through your own SMTP server. Compose plain-text or HTML email, or choose a saved project template and fill its variables from workflow data. Add To, CC and BCC recipients, and attach supported files produced or retrieved earlier in the workflow. Each send returns a message identifier plus recipient and attachment counts.
+
+Email a generated report, distribute completed documents, announce a successful run or notify a team when a workflow fails or awaits approval. Notification messages include the workflow and step context where available, helping recipients locate the relevant run. Reusable templates keep recurring messages consistent while letting each workflow supply its own details.
+
+Create a project connection with the SMTP host, supported port, SSL or STARTTLS mode and sender address. Add authentication credentials when required by your mail service, then select that connection in workflow steps or notification routes. This extension provides outbound email; reading replies requires a separate mailbox connector. Each message supports up to 10 recipients and a total encoded size of 25 MiB, or a lower configured limit. Attachment file-type restrictions apply.
 
 Logo: `icon.png` (the Flow Steward wave mark, PNG 128x128) next to
 `extension.yaml`.
 
 ## Requirements
 
-This release (0.3.2) speaks the host contract `extension_host_v2` with its final
+This release (0.3.3) speaks the host contract `extension_host_v2` with its final
 execution scope (`group_id`, `for_each_id`, `step_id`, `step_execution_id`)
 and is built on `flowsteward-extension-sdk` 0.4.0. A request with another
 contract, a missing scope key, both a Group and a For each as its owner, or a

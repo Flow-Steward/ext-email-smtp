@@ -2,9 +2,14 @@ manifest_version: 2
 lifecycle: {data_schema_version: 1, data_migrations: []}
 extension_id: flowsteward.outgoing-email
 kind: notification_provider
-version: 0.3.2
+version: 0.3.3
 display_name: Outgoing Email
-description: Send transactional emails from workflows and notifications through your SMTP server.
+description: |-
+  Outgoing Email sends workflow messages and project notifications through your own SMTP server. Compose plain-text or HTML email, or choose a saved project template and fill its variables from workflow data. Add To, CC and BCC recipients, and attach supported files produced or retrieved earlier in the workflow. Each send returns a message identifier plus recipient and attachment counts.
+
+  Email a generated report, distribute completed documents, announce a successful run or notify a team when a workflow fails or awaits approval. Notification messages include the workflow and step context where available, helping recipients locate the relevant run. Reusable templates keep recurring messages consistent while letting each workflow supply its own details.
+
+  Create a project connection with the SMTP host, supported port, SSL or STARTTLS mode and sender address. Add authentication credentials when required by your mail service, then select that connection in workflow steps or notification routes. This extension provides outbound email; reading replies requires a separate mailbox connector. Each message supports up to 10 recipients and a total encoded size of 25 MiB, or a lower configured limit. Attachment file-type restrictions apply.
 vendor:
   name: Flow Steward
   support_url: https://github.com/Flow-Steward/ext-email-smtp/issues
@@ -15,7 +20,10 @@ listing:
   - email
   - smtp
   - notifications
-  summary: Send email from workflow steps and project notifications through a custom SMTP connection.
+  summary: |-
+    Send text, HTML and template-based emails with workflow attachments through your project’s SMTP server.
+  setup_summary: |-
+    Create a custom SMTP project connection with host, supported port, SSL or STARTTLS and sender address; supply both username and secret password if authentication is required. Select that connection in Send Email steps or project notification routes and create saved templates if needed.
 features:
 - notify
 - action
