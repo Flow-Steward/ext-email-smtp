@@ -1,22 +1,22 @@
 operations:
   - operation_id: send_email
-    display_name: Send Email
-    description: Send one plain-text, HTML or template-backed email through the selected SMTP connection.
+    display_name: "Send email via SMTP"
+    description: "Send one plain-text, HTML or template-backed email through the selected SMTP connection. Create an SMTP server project connection with the host, port, security mode, sender address and any required login credentials, then select it for this step. Example: Email a generated PDF report to reports@example.com, mapping its artifact into an attachment descriptor."
     operation_kind: action
     category: email
     connection_type_ids: [custom_smtp]
     workflow_visible: true
     inputs:
       - {name: connection_ref, value_type: connection_ref, required: true}
-      - {name: to, value_type: text, required: true}
-      - {name: cc, value_type: text, required: false}
-      - {name: bcc, value_type: text, required: false}
+      - {name: to, value_type: text, required: true, description: "Recipient address, comma-separated addresses, or a mapped JSON array of addresses."}
+      - {name: cc, value_type: text, required: false, description: "Optional visible copy recipients: email addresses separated by commas, or a mapped array."}
+      - {name: bcc, value_type: text, required: false, description: "Optional blind copy recipients: email addresses separated by commas, or a mapped array."}
       - {name: subject, value_type: text, required: false}
       - {name: body_text, value_type: text, required: false}
       - {name: body_html, value_type: text, required: false}
-      - {name: template_id, value_type: text, required: false}
-      - {name: variables, value_type: object, required: false}
-      - {name: attachments, value_type: array, required: false}
+      - {name: template_id, value_type: text, required: false, description: "ID of a saved project email template. Supply template variables and leave direct message bodies empty when using a template."}
+      - {name: variables, value_type: object, required: false, description: "JSON object mapping the selected template's placeholder names to values."}
+      - {name: attachments, value_type: array, required: false, description: "JSON array of workflow artifact descriptors, each with artifact_handle (or artifact_id or binding_key) and a safe filename. Use supported file types such as PDF; URLs, paths and inline content are not accepted."}
     input_mapping_rules:
       - schema:
           type: object

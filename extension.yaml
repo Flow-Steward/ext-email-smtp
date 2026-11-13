@@ -2,7 +2,7 @@ manifest_version: 2
 lifecycle: {data_schema_version: 1, data_migrations: []}
 extension_id: flowsteward.outgoing-email
 kind: notification_provider
-version: 0.3.3
+version: 0.3.4
 display_name: Outgoing Email
 description: |-
   Outgoing Email sends workflow messages and project notifications through your own SMTP server. Compose plain-text or HTML email, or choose a saved project template and fill its variables from workflow data. Add To, CC and BCC recipients, and attach supported files produced or retrieved earlier in the workflow. Each send returns a message identifier plus recipient and attachment counts.

@@ -11,7 +11,7 @@ Logo: `icon.png` (the Flow Steward wave mark, PNG 128x128) next to
 
 ## Requirements
 
-This release (0.3.3) speaks the host contract `extension_host_v2` with its final
+This release (0.3.4) speaks the host contract `extension_host_v2` with its final
 execution scope (`group_id`, `for_each_id`, `step_id`, `step_execution_id`)
 and is built on `flowsteward-extension-sdk` 0.4.0. A request with another
 contract, a missing scope key, both a Group and a For each as its owner, or a
@@ -60,3 +60,7 @@ Mocked extension tests establish configuration and failure behavior. Proving
 real delivery requires the operator to run the separately provisioned fixture
 and verify receipt in Mailpit; saving a connection or a suppressed workflow
 Test Run is not delivery proof.
+
+## Workflow action guide
+
+See [Workflow actions](docs/workflow-actions.md) for connection setup, input formats, results and practical examples.
