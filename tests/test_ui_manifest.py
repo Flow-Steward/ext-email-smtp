@@ -16,12 +16,13 @@ def test_outgoing_email_ui_separates_connections_and_templates() -> None:
     manifest = _load_yaml("ui/ui_manifest.yaml")
     page_refs = [row["ref"] for row in manifest["pages"]]
 
-    assert page_refs == ["pages/connections.yaml", "pages/templates.yaml"]
+    assert page_refs == ["pages/connections.yaml", "pages/templates.yaml", "pages/support.yaml"]
 
     pages = [_load_yaml(f"ui/{page_ref}") for page_ref in page_refs]
     assert [(page["page_id"], page["title"]) for page in pages] == [
         ("connections", "Connections"),
         ("templates", "Templates"),
+        ("support", "Support"),
     ]
     assert pages[0]["components"] == [{"ref": "../components/connection_form.yaml"}]
     assert pages[1]["components"] == [{"ref": "../components/templates_form.yaml"}]
